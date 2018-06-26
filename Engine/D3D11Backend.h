@@ -10,7 +10,7 @@ public:
 	D3D11Backend( HWND Handle );
 	~D3D11Backend();
 
-	void Present( const class Color* pSysBuffer ) override;
+	void Present( const Color* pSysBuffer ) override;
 
 private:
 	Microsoft::WRL::ComPtr<IDXGISwapChain>				pSwapChain;

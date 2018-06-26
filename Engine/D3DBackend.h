@@ -3,6 +3,7 @@
 #include "ChiliWin.h"
 #include "ChiliException.h"
 #include <wrl/client.h>
+#include "Colors.h"
 
 class D3DBackend
 {
@@ -24,7 +25,7 @@ public:
 public:
 	virtual ~D3DBackend() = default;
 
-	virtual void Present( const class Color* pSysBuffer ) = 0;
+	virtual void Present( const Color* pSysBuffer ) = 0;
 
 protected:
 	// vertex format for the framebuffer fullscreen textured quad

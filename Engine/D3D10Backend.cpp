@@ -1,16 +1,13 @@
 #include "D3D10Backend.h"
 #include "Graphics.h"
 #include <assert.h>
+#include <d3dcompiler.h>
 
 #pragma comment( lib,"d3d10.lib" )
+#pragma comment( lib,"d3dcompiler.lib")
 
 // Ignore the intellisense error "cannot open source file" for .shh files.
 // They will be created during the build sequence before the preprocessor runs.
-namespace FramebufferShaders
-{
-#include "FramebufferPS.shh"
-#include "FramebufferVS.shh"
-}
 
 #ifndef CHILI_GFX_EXCEPTION
 #define CHILI_GFX_EXCEPTION( hr,note ) D3DBackend::Exception( hr,note,_CRT_WIDE(__FILE__),__LINE__ )
@@ -126,30 +123,61 @@ D3D10Backend::D3D10Backend( HWND Handle )
 		throw CHILI_GFX_EXCEPTION( hr, L"Creating view on sysBuffer texture" );
 	}
 
+	// Compile the Pixel Shader
+	ComPtr<ID3DBlob> psShader, pError;
+	if( FAILED( hr = D3DCompileFromFile(
+		L"FramebufferPS.hlsl",
+		nullptr,
+		nullptr,
+		"FramebufferPS10",
+		"ps_4_0",
+		0,
+		0,
+		&psShader,
+		&pError ) ) )
+	{
+		const std::string err = reinterpret_cast< char* >( pError->GetBufferPointer() );
+
+		throw CHILI_GFX_EXCEPTION( hr, std::wstring( err.begin(), err.end() ) );
+	}
 
 	////////////////////////////////////////////////
 	// create pixel shader for framebuffer
-	// Ignore the intellisense error "namespace has no member"
 	if( FAILED( hr = pDevice->CreatePixelShader(
-		FramebufferShaders::FramebufferPSBytecode,
-		sizeof( FramebufferShaders::FramebufferPSBytecode ),
+		psShader->GetBufferPointer(),
+		psShader->GetBufferSize(),
 		&pPixelShader ) ) )
 	{
 		throw CHILI_GFX_EXCEPTION( hr, L"Creating pixel shader" );
 	}
 
 
+	ComPtr<ID3DBlob> vsShader;
+	if( FAILED( hr = D3DCompileFromFile(
+		L"FramebufferVS.hlsl",
+		nullptr,
+		nullptr,
+		"FramebufferVS",
+		"vs_4_0",
+		0,
+		0,
+		&vsShader,
+		&pError ) ) )
+	{
+		const std::string err = reinterpret_cast< char* >( pError->GetBufferPointer() );
+
+		throw CHILI_GFX_EXCEPTION( hr, std::wstring( err.begin(), err.end() ) );
+	}
+
 	/////////////////////////////////////////////////
 	// create vertex shader for framebuffer
-	// Ignore the intellisense error "namespace has no member"
 	if( FAILED( hr = pDevice->CreateVertexShader(
-		FramebufferShaders::FramebufferVSBytecode,
-		sizeof( FramebufferShaders::FramebufferVSBytecode ),
+		vsShader->GetBufferPointer(),
+		vsShader->GetBufferSize(),
 		&pVertexShader ) ) )
 	{
 		throw CHILI_GFX_EXCEPTION( hr, L"Creating vertex shader" );
 	}
-
 
 	//////////////////////////////////////////////////////////////
 	// create and fill vertex buffer with quad for rendering frame
@@ -185,8 +213,8 @@ D3D10Backend::D3D10Backend( HWND Handle )
 
 	// Ignore the intellisense error "namespace has no member"
 	if( FAILED( hr = pDevice->CreateInputLayout( ied, 2,
-		FramebufferShaders::FramebufferVSBytecode,
-		sizeof( FramebufferShaders::FramebufferVSBytecode ),
+		vsShader->GetBufferPointer(),
+		vsShader->GetBufferSize(),
 		&pInputLayout ) ) )
 	{
 		throw CHILI_GFX_EXCEPTION( hr, L"Creating input layout" );

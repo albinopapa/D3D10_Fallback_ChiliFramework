@@ -1,16 +1,10 @@
 #include "D3D11Backend.h"
 #include "Graphics.h"
 #include <assert.h>
+#include <d3dcompiler.h>
 
 #pragma comment( lib,"d3d11.lib" )
-
-// Ignore the intellisense error "cannot open source file" for .shh files.
-// They will be created during the build sequence before the preprocessor runs.
-namespace FramebufferShaders
-{
-#include "FramebufferPS.shh"
-#include "FramebufferVS.shh"
-}
+#pragma comment( lib,"d3dcompiler.lib")
 
 #ifndef CHILI_GFX_EXCEPTION
 #define CHILI_GFX_EXCEPTION( hr,note ) D3DBackend::Exception( hr,note,_CRT_WIDE(__FILE__),__LINE__ )
@@ -130,25 +124,59 @@ D3D11Backend::D3D11Backend( HWND Handle )
 	}
 
 
+	// Compile the Pixel Shader
+	ComPtr<ID3DBlob> psShader, pError;
+	if( FAILED( hr = D3DCompileFromFile(
+		L"FramebufferPS.hlsl",
+		nullptr,
+		nullptr,
+		"FramebufferPS11",
+		"ps_4_0",
+		0,
+		0,
+		&psShader,
+		&pError ) ) )
+	{
+		const std::string err = reinterpret_cast< char* >( pError->GetBufferPointer() );
+
+		throw CHILI_GFX_EXCEPTION( hr, std::wstring( err.begin(), err.end() ) );
+	}
+
 	////////////////////////////////////////////////
 	// create pixel shader for framebuffer
 	// Ignore the intellisense error "namespace has no member"
 	if( FAILED( hr = pDevice->CreatePixelShader(
-		FramebufferShaders::FramebufferPSBytecode,
-		sizeof( FramebufferShaders::FramebufferPSBytecode ),
+		psShader->GetBufferPointer(),
+		psShader->GetBufferSize(),
 		nullptr,
 		&pPixelShader ) ) )
 	{
 		throw CHILI_GFX_EXCEPTION( hr, L"Creating pixel shader" );
 	}
 
+	// Compile the Vertex Shader
+	ComPtr<ID3DBlob> vsShader;
+	if( FAILED( hr = D3DCompileFromFile(
+		L"FramebufferVS.hlsl",
+		nullptr,
+		nullptr,
+		"FramebufferVS",
+		"vs_4_0",
+		0,
+		0,
+		&vsShader,
+		&pError ) ) )
+	{
+		const std::string err = reinterpret_cast< char* >( pError->GetBufferPointer() );
+
+		throw CHILI_GFX_EXCEPTION( hr, std::wstring( err.begin(), err.end() ) );
+	}
 
 	/////////////////////////////////////////////////
 	// create vertex shader for framebuffer
-	// Ignore the intellisense error "namespace has no member"
 	if( FAILED( hr = pDevice->CreateVertexShader(
-		FramebufferShaders::FramebufferVSBytecode,
-		sizeof( FramebufferShaders::FramebufferVSBytecode ),
+		vsShader->GetBufferPointer(),
+		vsShader->GetBufferSize(),
 		nullptr,
 		&pVertexShader ) ) )
 	{
@@ -190,8 +218,8 @@ D3D11Backend::D3D11Backend( HWND Handle )
 
 	// Ignore the intellisense error "namespace has no member"
 	if( FAILED( hr = pDevice->CreateInputLayout( ied, 2,
-		FramebufferShaders::FramebufferVSBytecode,
-		sizeof( FramebufferShaders::FramebufferVSBytecode ),
+		vsShader->GetBufferPointer(),
+		vsShader->GetBufferSize(),
 		&pInputLayout ) ) )
 	{
 		throw CHILI_GFX_EXCEPTION( hr, L"Creating input layout" );
