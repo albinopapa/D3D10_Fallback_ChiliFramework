@@ -42,4 +42,34 @@ void Game::UpdateModel()
 
 void Game::ComposeFrame()
 {
+	// D3D 10 only supports RGBA colors, so here's a little test
+	// The top left should be red
+	// The middle should be green
+	// The bottom left should be blue
+	// 
+	// If the top right is red and the bottom right is blue, then you're running D3D10
+	for( int y = 0; y < Graphics::ScreenHeight; ++y )
+	{
+		for( int x = 0; x < Graphics::ScreenWidth; ++x )
+		{
+			Color c;
+			if( y < 200 )
+			{
+				c = ( x < Graphics::ScreenWidth / 2 ) ? Colors::Red : Colors::Blue;
+			}
+			else if( y < 400 )
+			{
+				c = Colors::Green;
+			}
+			else
+			{
+				c = ( x < Graphics::ScreenWidth / 2 ) ? Colors::Blue : Colors::Red;
+			}
+			
+
+			gfx.PutPixel( x, y, c );
+		}
+	}
+
+
 }
