@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Rect.h"
 #include <cassert>
 
 template<class Fn>
@@ -8,6 +9,18 @@ void for_each( int _xStart, int _yStart, int _xEnd, int _yEnd, Fn _func )
 	for( int y = _yStart; y < _yEnd; ++y )
 	{
 		for( int x = _xStart; x < _xEnd; ++x )
+		{
+			_func( x, y );
+		}
+	}
+}
+
+template<class Fn>
+void for_each( const Rect<int>& _region, Fn _func )
+{
+	for( int y = _region.top; y < _region.bottom; ++y )
+	{
+		for( int x = _region.left; x < _region.right; ++x )
 		{
 			_func( x, y );
 		}
@@ -58,4 +71,9 @@ template<class T>
 bool is_in_range( const T& val, const T& low, const T& hi )
 {
 	return ( ( val >= low ) && ( val <= hi ) );
+}
+
+inline Vec2f reflect( const Vec2f& d, const Vec2f& n )
+{
+	return d + ( -2.f * ( DotProduct( d, n ) * n ) );
 }

@@ -12,8 +12,13 @@ image::image( int _width, int _height, std::unique_ptr<element_type[]> elements 
 {}
 
 image::image( image&& _src )noexcept
+	:
+	pData( std::move( _src.pData ) ),
+	_width( _src._width ),
+	_height( _src._height )
 {
-	swap( _src );
+	_src._width = 0;
+	_src._height = 0;
 }
 
 image::~image()

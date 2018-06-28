@@ -23,6 +23,7 @@
 #include "Keyboard.h"
 #include "Mouse.h"
 #include "Graphics.h"
+#include "AniSprite.h"
 
 class Game
 {
@@ -43,4 +44,14 @@ private:
 	/********************************/
 	/*  User Variables              */
 	/********************************/
+	// Animations
+	AniSprite idle, walk;
+	AniSprite* current;
+	// Transforms
+	Matrix<3, 2, float> transform;
+
+	// Misc
+	Vec2f pos;
+	float direction = 1.f;
+	int frame = 0, frameDelay = 0, frameDelayCount = 0;
 };

@@ -24,8 +24,13 @@
 Game::Game( MainWindow& wnd )
 	:
 	wnd( wnd ),
-	gfx( wnd )
+	gfx( wnd ),
+	idle( "sprite/idle", 1 ),
+	walk( "sprite/walk", 30 ),
+	pos( 0.f, -200.f )
 {
+	const auto sprite = idle.GetFrame();
+	transform = Matrix<3, 2, float>::Scaling( { sprite.width(), sprite.height() } );
 }
 
 void Game::Go()
@@ -38,36 +43,27 @@ void Game::Go()
 
 void Game::UpdateModel()
 {
+	float speed = 0.f;
+	if( wnd.kbd.KeyIsPressed( VK_LEFT ) || wnd.kbd.KeyIsPressed( VK_RIGHT ) )
+	{
+		direction = wnd.kbd.KeyIsPressed( VK_RIGHT ) ? 1.f : -1.f;
+		current = &walk;
+		speed = 5.f;
+	}
+	else
+	{
+		current = &idle;
+	}
+	
+	pos.x += ( speed * direction );
+
+	current->Advance( 0.016f );
+	transform = 
+		Matrix<3, 2, float>::Scaling( Vec2f( current->GetFrame().width() * direction, current->GetFrame().height() ) * 1.f ) *
+		Matrix<3, 2, float>::Translation( pos );
 }
 
 void Game::ComposeFrame()
 {
-	// D3D 10 only supports RGBA colors, so here's a little test
-	// The top left should be red, top right should be blue
-	// The middle should be green
-	// The bottom left should be blue, bottom right should be red
-	for( int y = 0; y < Graphics::ScreenHeight; ++y )
-	{
-		for( int x = 0; x < Graphics::ScreenWidth; ++x )
-		{
-			Color c;
-			if( y < 200 )
-			{
-				c = ( x < Graphics::ScreenWidth / 2 ) ? Colors::Red : Colors::Blue;
-			}
-			else if( y < 400 )
-			{
-				c = Colors::Green;
-			}
-			else
-			{
-				c = ( x < Graphics::ScreenWidth / 2 ) ? Colors::Blue : Colors::Red;
-			}
-			
-
-			gfx.PutPixel( x, y, c );
-		}
-	}
-
-
+	gfx.DrawSprite( transform, current->GetFrame() );
 }
