@@ -24,6 +24,9 @@
 #include "Mouse.h"
 #include "Graphics.h"
 #include "AniSprite.h"
+#include "FrameTimer.h"
+#include "SpriteResources.h"
+#include "Star.h"
 
 class Game
 {
@@ -45,13 +48,14 @@ private:
 	/*  User Variables              */
 	/********************************/
 	// Animations
-	AniSprite idle, walk;
-	AniSprite* current;
-	// Transforms
-	Matrix<3, 2, float> transform;
+	SpriteResources resources;
 
 	// Misc
-	Vec2f pos;
-	float direction = 1.f;
-	int frame = 0, frameDelay = 0, frameDelayCount = 0;
+	FrameTimer timer;
+
+	// Player
+	Star star;
+
+	// Obstacle
+	RectF obs;
 };

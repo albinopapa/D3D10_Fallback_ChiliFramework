@@ -9,6 +9,8 @@ AniSprite::AniSprite( const std::string& _base, int _numFrames )
 		std::string filename = _base + std::to_string( i / 10 ) + std::to_string( i % 10 ) + ".png";
 		frames.emplace_back( grafix::wic_image_decoder( std::move( filename ) ) );
 	}
+
+	current = frames.begin();
 }
 
 void AniSprite::Advance( float dt ) 

@@ -42,52 +42,49 @@ public:
 };
 
 template<class T> Rect<T> operator+( const Rect<T>& _rect, const Vec2<T>& _offset );
-template<class T> T GetWidth( const Rect<T>& _rect );
-template<class T> T GetHeight( const Rect<T>& _rect );
-template<class T> Vec2<T> MidPoint( const Rect<T>& _lhs );
-template<class T> bool Contains( const Rect<T>& _lhs, const Rect<T>& _rhs );
-template<class T> bool Contains( const Rect<T>& _lhs, const Vec2<T>& _rhs );
-template<class T> bool Overlaps( const Rect<T>& _lhs, const Rect<T>& _rhs );
+template<class T> T RectWidth( const Rect<T>& _rect );
+template<class T> T RectHeight( const Rect<T>& _rect );
+template<class T> Vec2<T> RectCenter( const Rect<T>& _lhs );
+template<class T> bool RectContains( const Rect<T>& _lhs, const Rect<T>& _rhs );
+template<class T> bool RectContains( const Rect<T>& _lhs, const Vec2<T>& _rhs );
+template<class T> bool RectOverlaps( const Rect<T>& _lhs, const Rect<T>& _rhs );
 
 template<class T> Rect<T> operator+( const Rect<T>& _rect, const Vec2<T>& _offset )
 {
 	return Rect<T>( _rect ) += _offset;
 }
-template<class T> Vec2<T> MidPoint( const Rect<T>& _lhs )
+template<class T> Vec2<T> RectCenter( const Rect<T>& _lhs )
 {
 	return Lerp( Vec2f{ _lhs.left,_lhs.top }, Vec2f{ _lhs.right, _lhs.bottom }, .5f );
 }
-template<class T> T GetWidth( const Rect<T>& _rect )
+template<class T> T RectWidth( const Rect<T>& _rect )
 {
-	return _rect.right - _rect.left;
+	return std::abs( _rect.right - _rect.left );
 }
-template<class T> T GetHeight( const Rect<T>& _rect )
+template<class T> T RectHeight( const Rect<T>& _rect )
 {
-	return _rect.bottom - _rect.top;
+	return std::abs( _rect.bottom - _rect.top );
 }
 
-template<class T>
-bool Contains( const Rect<T>& _lhs, const Rect<T>& _rhs )
+template<class T> bool RectContains( const Rect<T>& _lhs, const Rect<T>& _rhs )
 {
 	return
 		_lhs.left < _rhs.left && _lhs.right > _rhs.right &&
 		_lhs.top < _rhs.top && _lhs.bottom > _rhs.bottom;
 }
 
-template<class T>
-bool Contains( const Rect<T>& _lhs, const Vec2<T>& _rhs )
+template<class T> bool RectContains( const Rect<T>& _lhs, const Vec2<T>& _rhs )
 {
 	return
 		_lhs.left < _rhs.x && _lhs.right > _rhs.x &&
 		_lhs.top < _rhs.y && _lhs.bottom > _rhs.y;
 }
 
-template<class T>
-bool Overlaps( const Rect<T>& _lhs, const Rect<T>& _rhs )
+template<class T> bool RectOverlaps( const Rect<T>& _lhs, const Rect<T>& _rhs )
 {
 	return
-		_lhs.right > _rhs.left && _lhs.left < _rhs.right &&
-		_lhs.bottom > _rhs.top && _lhs.top < _rhs.bottom;
+		_lhs.right >= _rhs.left && _lhs.left <= _rhs.right &&
+		_lhs.top >= _rhs.bottom && _lhs.bottom <= _rhs.top;
 }
 
 using RectF = Rect<float>;

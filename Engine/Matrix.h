@@ -101,6 +101,8 @@ private:
 	};	
 };
 
+using Matrix3x2f = Matrix<3, 2, float>;
+
 template<class T> Matrix<3, 2, T> operator*( const Matrix<3, 2, T>& _lhs, const Matrix<3, 2, T>& _rhs )
 {
 	Matrix<3, 2, T> mat;

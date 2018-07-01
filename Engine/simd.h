@@ -289,6 +289,10 @@ public:
 			_mm_load_ps( pVal ) : _mm_loadu_ps( pVal );
 	}
 
+	explicit _vectorcall operator int128()const
+	{
+		return int128( _mm_cvtps_epi32( value ) );
+	}
 	_vectorcall operator __m128( )const
 	{
 		return value;

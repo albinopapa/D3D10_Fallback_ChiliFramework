@@ -24,6 +24,7 @@
 #include "Graphics.h"
 #include <assert.h>
 #include <string>
+#include "simd.h"
 
 // allocate memory for sysbuffer (16-byte aligned for faster access)
 Graphics::Graphics( HWNDKey& key )
@@ -118,21 +119,63 @@ void Graphics::DrawSprite( const Matrix<3, 2, float>& transform, Sprite sprite )
 	 
 void Graphics::DrawTriangle( const Matrix<3, 2, float>& transform, Sprite sprite )
 {
-	auto Rasterize = [ this, sprite ]( const int X, const int Y, const Vec2f& P, const Triangle& tri )
+	auto Rasterize = [ this, sprite ]( const int X, const int Y, const Vec2f& P, const Triangle<x86>& tri )
 	{
 		const auto coord = tri.GetBaryCoords( P );
 		if( coord.IsBarycentric() )
 		{
-			const auto tc = coord.Interpolate(
-				tri.GetVertex( 0 ).tex, tri.GetVertex( 1 ).tex, tri.GetVertex( 2 ).tex
-			);
-			const int tx = int( tc.x * sprite.width() );
-			const int ty = int( tc.y * sprite.height() );
+			const auto tc = coord.Interpolate( tri[ 0 ].tex, tri[ 1 ].tex, tri[ 2 ].tex );
+
+			const int tx = int( tc.x * ( sprite.width() - 1.f ) );
+			const int ty = int( tc.y * ( sprite.height() - 1.f ) );
 
 			PutPixelAlpha( X, Y, sprite.pixel( tx, ty ) );
 		}
 	};
 	
+	auto sseRasterize = 
+		[ this, sprite ]( const int X, const int Y, const Vec2SSE P, const Triangle<SSE>& tri )
+	{
+		// Get texture dimensions
+		float128 texWidth( sprite.width() - 1.f );
+		float128 texHeight( sprite.height() - 1.f );
+
+		const auto coords = tri.GetBaryCoords( P );
+
+		const auto v0 = tri.GetVertexTexcoord( 0 );
+		const auto v1 = tri.GetVertexTexcoord( 1 );
+		const auto v2 = tri.GetVertexTexcoord( 2 );
+
+		// Interpolate texture coordinates
+		Vec2SSE tc = coords.Interpolate(
+			tri.GetVertexTexcoord( 0 ),
+			tri.GetVertexTexcoord( 1 ),
+			tri.GetVertexTexcoord( 2 )
+		);
+
+		tc.x *= texWidth;
+		tc.y *= texHeight;
+
+		// Convert to integers
+		int128 itx = int128( tc.x );
+		int128 ity = int128( tc.y );
+
+		// Store results
+		alignas( 16 ) int tcx[ 4 ], tcy[ 4 ];
+		itx.Store( tcx );
+		ity.Store( tcy );
+
+		// Loop through results, skipping any that were masked out
+		for( int i = 0; i < 4; ++i )
+		{
+			if( coords.IsBarycentric( i ) )
+			{
+				const Color c = sprite.pixel( tcx[ i ], tcy[ i ] );
+				PutPixelAlpha( X + i, Y, c );
+			}
+		}
+	};
+
 	// Transform the vertices
 	std::array<Vertex, 4> tverts;
 	std::transform( quad.begin(), quad.end(), tverts.begin(), [ &transform ]( const Vertex& v )
@@ -144,7 +187,7 @@ void Graphics::DrawTriangle( const Matrix<3, 2, float>& transform, Sprite sprite
 			return out;
 		} );
 
-	
+	// Transform to screen space
 	std::transform( tverts.begin(), tverts.end(), tverts.begin(), [ this ]( const Vertex& v )
 		{
 			Vertex out;
@@ -155,21 +198,31 @@ void Graphics::DrawTriangle( const Matrix<3, 2, float>& transform, Sprite sprite
 		} );
 	
 	// Pack vertices into a Triangle object where the area will be calculated upon construction
-	std::array<Triangle, 2> tris =
-	{
-		Triangle( tverts[ 0 ], tverts[ 1 ], tverts[ 2 ] ),
-		Triangle( tverts[ 3 ], tverts[ 2 ], tverts[ 1 ] )
+	std::array<Triangle<x86>, 2> tris = {
+		Triangle<x86>( tverts[ 0 ], tverts[ 1 ], tverts[ 2 ] ),
+		Triangle<x86>( tverts[ 3 ], tverts[ 2 ], tverts[ 1 ] )
 	};
 
 	// Loop through bounding box
 	const auto box = BoundingBox( tverts );
 	const auto rect = Clipper()( box, GetScreenRect() );
-	for_each( rect, [ &Rasterize, tris ]( int ix, int iy )
-		{
-			const Vec2f p = Vec2f( float( ix ), float( iy ) );
-			Rasterize( ix, iy, p, tris[ 0 ] );
-			Rasterize( ix, iy, p, tris[ 1 ] );
-		} );
+
+	auto x86Rasterize = [ &Rasterize, tris ]( int ix, int iy )
+	{
+		const Vec2f p = Vec2f( float( ix ), float( iy ) );
+		Rasterize( ix, iy, p, tris[ 0 ] );
+		Rasterize( ix, iy, p, tris[ 1 ] );
+	};
+	auto m128Rasterize = [ this, &sseRasterize, tris ]( int ix, int iy )
+	{
+		const Vec2f p = Vec2f( float( ix ), float( iy ) );
+		Vec2SSE mp( float128( p.x + 3.f, p.x + 2.f, p.x + 1.f, p.x ), float128( p.y ) );
+
+		sseRasterize( ix, iy, mp, { tris[ 0 ] } );
+		sseRasterize( ix, iy, mp, { tris[ 1 ] } );
+	};
+	//for_each( rect, x86Rasterize );
+	simd_for_each<4>( rect.left, rect.top, rect.right, rect.bottom, m128Rasterize, x86Rasterize );
 }
 Rect<int> Graphics::GetScreenRect()const
 {

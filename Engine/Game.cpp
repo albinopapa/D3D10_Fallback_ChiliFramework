@@ -25,12 +25,12 @@ Game::Game( MainWindow& wnd )
 	:
 	wnd( wnd ),
 	gfx( wnd ),
-	idle( "sprite/idle", 1 ),
-	walk( "sprite/walk", 30 ),
-	pos( 0.f, -200.f )
+	star( { 0.f, -200.f }, resources, wnd.kbd ),
+	obs( { -32.f, 64.f }, { 32.f, -64.f } )
 {
-	const auto sprite = idle.GetFrame();
-	transform = Matrix<3, 2, float>::Scaling( { sprite.width(), sprite.height() } );
+	obs += RectCenter( obs ) + Vec2f( 100.f, -200.f );
+	std::vector<std::string> str = {"hello", "world"};
+
 }
 
 void Game::Go()
@@ -43,27 +43,24 @@ void Game::Go()
 
 void Game::UpdateModel()
 {
-	float speed = 0.f;
-	if( wnd.kbd.KeyIsPressed( VK_LEFT ) || wnd.kbd.KeyIsPressed( VK_RIGHT ) )
-	{
-		direction = wnd.kbd.KeyIsPressed( VK_RIGHT ) ? 1.f : -1.f;
-		current = &walk;
-		speed = 5.f;
-	}
-	else
-	{
-		current = &idle;
-	}
-	
-	pos.x += ( speed * direction );
+	const float dt = timer.Mark();
+	star.Update( dt );
 
-	current->Advance( 0.016f );
-	transform = 
-		Matrix<3, 2, float>::Scaling( Vec2f( current->GetFrame().width() * direction, current->GetFrame().height() ) * 1.f ) *
-		Matrix<3, 2, float>::Translation( pos );
+	const auto bb = star.GetRect();
+	if( RectOverlaps( bb, obs ) )
+	{
+		const auto& pos = star.GetPosition();
+		star.SetPosition( { pos.x - ( bb.right - obs.left ), pos.y } );
+	}
 }
 
 void Game::ComposeFrame()
 {
-	gfx.DrawSprite( transform, current->GetFrame() );
+	const auto obsTrans =
+		Matrix3x2f::Scaling( { RectWidth( obs ), RectHeight( obs ) } ) *
+		Matrix3x2f::Translation( RectCenter( obs ) );
+
+	gfx.DrawSprite( obsTrans, { resources.box } );
+
+	star.Draw( gfx );
 }
