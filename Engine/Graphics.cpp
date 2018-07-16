@@ -25,13 +25,14 @@
 #include <assert.h>
 #include <string>
 #include "simd.h"
+#include "template_math_ops.h"
 
 // allocate memory for sysbuffer (16-byte aligned for faster access)
 Graphics::Graphics( HWNDKey& key )
 	:
 	pSysBuffer( reinterpret_cast< Color* >(
 		_aligned_malloc( sizeof( Color ) * Graphics::ScreenWidth * Graphics::ScreenHeight, 16u ) ) ),
-	screen( Matrix<3, 2, float>::Scaling( { ( float( ScreenWidth ) / float( ScreenHeight ) ), -1.f } ) *
+	screen( Matrix<3, 2, float>::Scaling( { 1.f, -1.f } ) *
 		Matrix<3, 2, float>::Translation( Vec2f{ float( ScreenWidth ), float( ScreenHeight ) } *.5f ) )
 {
 	try
@@ -101,8 +102,7 @@ void Graphics::PutPixelAlpha( int x, int y, Color c )
 	const auto ca = c.GetA();
 	const auto da = 255 - ca;
 	const auto dst = GetPixel( x, y );
-	if( ca > 0 && ca < 255 )
-		int a = 0;
+
 	const Color result = {
 		unsigned char( ( ( c.GetR() * ca ) + ( dst.GetR() * da ) ) >> 8 ),
 		unsigned char( ( ( c.GetG() * ca ) + ( dst.GetG() * da ) ) >> 8 ),
@@ -112,119 +112,120 @@ void Graphics::PutPixelAlpha( int x, int y, Color c )
 	PutPixel( x, y, result );
 }
 
-void Graphics::DrawSprite( const Matrix<3, 2, float>& transform, Sprite sprite )
+void Graphics::DrawLine( const Vec2f & p0, const Vec2f & p1, const float thickness, const Sprite& sprite )
 {
-	DrawTriangle( transform, sprite );
-}
-	 
-void Graphics::DrawTriangle( const Matrix<3, 2, float>& transform, Sprite sprite )
-{
-	auto Rasterize = [ this, sprite ]( const int X, const int Y, const Vec2f& P, const Triangle<x86>& tri )
+	const Vec2f a = p1 - p0;
+	const Vec2f aHat = Normalize( a );
+	const float aLen = DotProduct( a, aHat );
+	const Vec2f offset = p0 + ( a * .5f );
+	const auto rotation = [ aHat ]()
 	{
-		const auto coord = tri.GetBaryCoords( P );
-		if( coord.IsBarycentric() )
+		Matrix3x2f rotation;
+		rotation.Row( 0 ) = { aHat.x, aHat.y };
+		rotation.Row( 1 ) = { -aHat.y, aHat.x };
+		rotation.Row( 2 ) = { 0.f, 0.f };
+		return rotation;
+	}( );
+
+	const Matrix3x2f mat = Matrix3x2f::Scaling( { aLen, thickness } ) * rotation * Matrix3x2f::Translation( offset );
+
+	DrawTriangle( mat, sprite, [ this ]( int x, int y, Color c )
 		{
-			const auto tc = coord.Interpolate( tri[ 0 ].tex, tri[ 1 ].tex, tri[ 2 ].tex );
-
-			const int tx = int( tc.x * ( sprite.width() - 1.f ) );
-			const int ty = int( tc.y * ( sprite.height() - 1.f ) );
-
-			PutPixelAlpha( X, Y, sprite.pixel( tx, ty ) );
-		}
-	};
-	
-	auto sseRasterize = 
-		[ this, sprite ]( const int X, const int Y, const Vec2SSE P, const Triangle<SSE>& tri )
-	{
-		// Get texture dimensions
-		float128 texWidth( sprite.width() - 1.f );
-		float128 texHeight( sprite.height() - 1.f );
-
-		const auto coords = tri.GetBaryCoords( P );
-
-		const auto v0 = tri.GetVertexTexcoord( 0 );
-		const auto v1 = tri.GetVertexTexcoord( 1 );
-		const auto v2 = tri.GetVertexTexcoord( 2 );
-
-		// Interpolate texture coordinates
-		Vec2SSE tc = coords.Interpolate(
-			tri.GetVertexTexcoord( 0 ),
-			tri.GetVertexTexcoord( 1 ),
-			tri.GetVertexTexcoord( 2 )
-		);
-
-		tc.x *= texWidth;
-		tc.y *= texHeight;
-
-		// Convert to integers
-		int128 itx = int128( tc.x );
-		int128 ity = int128( tc.y );
-
-		// Store results
-		alignas( 16 ) int tcx[ 4 ], tcy[ 4 ];
-		itx.Store( tcx );
-		ity.Store( tcy );
-
-		// Loop through results, skipping any that were masked out
-		for( int i = 0; i < 4; ++i )
-		{
-			if( coords.IsBarycentric( i ) )
-			{
-				const Color c = sprite.pixel( tcx[ i ], tcy[ i ] );
-				PutPixelAlpha( X + i, Y, c );
-			}
-		}
-	};
-
-	// Transform the vertices
-	std::array<Vertex, 4> tverts;
-	std::transform( quad.begin(), quad.end(), tverts.begin(), [ &transform ]( const Vertex& v )
-		{
-			Vertex out;
-			out.pos = transform * v.pos;
-			out.tex = v.tex;
-
-			return out;
+			PutPixel( x, y, c );
 		} );
-
-	// Transform to screen space
-	std::transform( tverts.begin(), tverts.end(), tverts.begin(), [ this ]( const Vertex& v )
-		{
-			Vertex out;
-			out.pos = screen * v.pos;
-			out.tex = v.tex;
-
-			return out;
-		} );
-	
-	// Pack vertices into a Triangle object where the area will be calculated upon construction
-	std::array<Triangle<x86>, 2> tris = {
-		Triangle<x86>( tverts[ 0 ], tverts[ 1 ], tverts[ 2 ] ),
-		Triangle<x86>( tverts[ 3 ], tverts[ 2 ], tverts[ 1 ] )
-	};
-
-	// Loop through bounding box
-	const auto box = BoundingBox( tverts );
-	const auto rect = Clipper()( box, GetScreenRect() );
-
-	auto x86Rasterize = [ &Rasterize, tris ]( int ix, int iy )
-	{
-		const Vec2f p = Vec2f( float( ix ), float( iy ) );
-		Rasterize( ix, iy, p, tris[ 0 ] );
-		Rasterize( ix, iy, p, tris[ 1 ] );
-	};
-	auto m128Rasterize = [ this, &sseRasterize, tris ]( int ix, int iy )
-	{
-		const Vec2f p = Vec2f( float( ix ), float( iy ) );
-		Vec2SSE mp( float128( p.x + 3.f, p.x + 2.f, p.x + 1.f, p.x ), float128( p.y ) );
-
-		sseRasterize( ix, iy, mp, { tris[ 0 ] } );
-		sseRasterize( ix, iy, mp, { tris[ 1 ] } );
-	};
-	//for_each( rect, x86Rasterize );
-	simd_for_each<4>( rect.left, rect.top, rect.right, rect.bottom, m128Rasterize, x86Rasterize );
 }
+
 Rect<int> Graphics::GetScreenRect()const
 {
 	return { 0, 0, ScreenWidth, ScreenHeight };
+}
+
+std::array<Vertex, 4> Graphics::TransformVertices( const Matrix<3, 2, float>& transform )const
+{
+	// Transform the vertices
+	const auto screenTransform = transform * screen;
+	std::array<Vertex, 4> tverts;
+	std::transform( quad.begin(), quad.end(), tverts.begin(), [ &screenTransform ]( const Vertex& v )
+		{
+			Vertex out;
+			out.pos = screenTransform * v.pos;
+			out.tex = v.tex;
+
+			return out;
+		} );
+
+	return tverts;
+}
+std::vector<Triangle<x86>> Graphics::Traingulate( std::array<Vertex, 4> tverts )const
+{
+	auto make_tri = []( const Vertex& _a, const Vertex& _b, const Vertex& _c )
+	{
+		const Vertex* pa = &_a, *pb = &_b, *pc = &_c;
+		if( pa->pos.y > pb->pos.y ) std::swap( pa, pb );
+		if( pb->pos.y > pc->pos.y ) std::swap( pb, pc );
+		if( pa->pos.y > pb->pos.y ) std::swap( pa, pb );
+
+		std::vector<Triangle<x86>> tris;
+		if( pa->pos.y == pb->pos.y )
+		{
+			if( ( *pa ).pos.x > ( *pb ).pos.x )
+			{
+				tris.emplace_back( *pb, *pa, *pc );
+			}
+			else
+			{
+				tris.emplace_back( *pa, *pb, *pc );
+			}
+		}
+		else if( ( *pb ).pos.y == ( *pc ).pos.y )
+		{
+			if( ( *pb ).pos.x > ( *pc ).pos.x )
+			{
+				tris.emplace_back( *pa, *pc, *pb );
+			}
+			else
+			{
+				tris.emplace_back( *pa, *pb, *pc );
+			}
+		}
+		else
+		{
+			const auto sHeight = ( *pb ).pos.y - ( *pa ).pos.y;
+			const auto lHeight = ( *pc ).pos.y - ( *pa ).pos.y;
+			const auto posSlope = ( ( *pc ).pos - ( *pa ).pos ) / lHeight;
+			const auto dPos = ( *pa ).pos + ( posSlope * sHeight );
+
+			const auto texSlope = ( ( *pc ).tex - ( *pa ).tex ) / lHeight;
+			const auto dTex = ( *pa ).tex + ( texSlope * sHeight );
+			const Vertex d = { dPos, dTex };
+
+			if( d.pos.x < ( *pb ).pos.x )
+			{
+				// Flat bottom
+				tris.emplace_back( *pa, d, ( *pb ) );
+				// Flat top
+				tris.emplace_back( d, *pb, *pc );
+			}
+			else
+			{
+				// Flat bottom
+				tris.emplace_back( *pa, *pb, d );
+				// Flat top
+				tris.emplace_back( *pb, d, _c );
+			}
+		}
+
+		return tris;
+	};
+
+	auto tris = make_tri( tverts[ 0 ], tverts[ 1 ], tverts[ 2 ] );
+	auto t1 = make_tri( tverts[ 3 ], tverts[ 2 ], tverts[ 1 ] );
+	tris.insert( tris.end(), t1.begin(), t1.end() );
+	return tris;
+
+	// Pack vertices into a Triangle object where the area will be calculated upon construction
+	/*return{
+		Triangle<x86>( tverts[ 0 ], tverts[ 1 ], tverts[ 2 ] ),
+		Triangle<x86>( tverts[ 3 ], tverts[ 2 ], tverts[ 1 ] )
+	};*/
 }

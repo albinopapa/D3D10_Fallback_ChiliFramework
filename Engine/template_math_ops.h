@@ -53,7 +53,7 @@ auto CrossProduct( const vec_type<ElemCount, scalar_type>& _lhs, const vec_type<
 	{
 		return
 			vec_type<ElemCount, scalar_type>( _lhs.y * _rhs.z, _lhs.z * _rhs.x, _lhs.x * _rhs.y ) -
-			vec_type<ElemCount, scalar_type>( _lhs.z * _rhs.y, _lhs.x * _rhs.z, _lhs.y * _rhs.z );
+			vec_type<ElemCount, scalar_type>( _lhs.z * _rhs.y, _lhs.x * _rhs.z, _lhs.y * _rhs.x );
 	}
 }
 
@@ -64,3 +64,9 @@ vec_type<ElemCount, scalar_type> Lerp( const vec_type<ElemCount, scalar_type>& _
 	return _start + ( ( _end - _start ) * _t );
 }
 
+template<template<size_t, class> class vec_type, size_t ElemCount, class scalar_type>
+vec_type<ElemCount, scalar_type> Normalize( const vec_type<ElemCount, scalar_type>& v )
+{
+	const auto vLen = sqrtf( DotProduct( v, v ) );
+	return ( vLen != 0.f ) ? v * ( 1.f / vLen ) : vec_type<ElemCount, scalar_type>::Zero();
+}

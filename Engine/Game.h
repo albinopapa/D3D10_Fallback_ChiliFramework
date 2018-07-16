@@ -23,10 +23,8 @@
 #include "Keyboard.h"
 #include "Mouse.h"
 #include "Graphics.h"
-#include "AniSprite.h"
 #include "FrameTimer.h"
-#include "SpriteResources.h"
-#include "Star.h"
+#include "World.h"
 
 class Game
 {
@@ -47,15 +45,10 @@ private:
 	/********************************/
 	/*  User Variables              */
 	/********************************/
-	// Animations
-	SpriteResources resources;
-
 	// Misc
 	FrameTimer timer;
-
-	// Player
-	Star star;
-
-	// Obstacle
-	RectF obs;
+	EventManager events;
+	World world;
+	
 };
+#define internal static 

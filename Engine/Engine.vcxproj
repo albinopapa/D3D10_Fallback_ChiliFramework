@@ -153,6 +153,7 @@
     <ClInclude Include="D3D11Backend.h" />
     <ClInclude Include="D3DBackend.h" />
     <ClInclude Include="DXErr.h" />
+    <ClInclude Include="Entity.h" />
     <ClInclude Include="FrameTimer.h" />
     <ClInclude Include="Game.h" />
     <ClInclude Include="Graphics.h" />
@@ -170,9 +171,11 @@
     <ClInclude Include="Sprite.h" />
     <ClInclude Include="SpriteResources.h" />
     <ClInclude Include="Star.h" />
+    <ClInclude Include="StarState.h" />
     <ClInclude Include="template_math_ops.h" />
     <ClInclude Include="utility.h" />
     <ClInclude Include="Vector.h" />
+    <ClInclude Include="World.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AniSprite.cpp" />
@@ -192,6 +195,8 @@
     <ClCompile Include="Sound.cpp" />
     <ClCompile Include="Sprite.cpp" />
     <ClCompile Include="Star.cpp" />
+    <ClCompile Include="StarState.cpp" />
+    <ClCompile Include="World.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="FramebufferPS.hlsl">

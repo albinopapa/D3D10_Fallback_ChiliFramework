@@ -25,11 +25,8 @@ Game::Game( MainWindow& wnd )
 	:
 	wnd( wnd ),
 	gfx( wnd ),
-	star( { 0.f, -200.f }, resources, wnd.kbd ),
-	obs( { -32.f, 64.f }, { 32.f, -64.f } )
+	world( wnd.kbd )
 {
-	obs += RectCenter( obs ) + Vec2f( 100.f, -200.f );
-	std::vector<std::string> str = {"hello", "world"};
 
 }
 
@@ -44,23 +41,10 @@ void Game::Go()
 void Game::UpdateModel()
 {
 	const float dt = timer.Mark();
-	star.Update( dt );
-
-	const auto bb = star.GetRect();
-	if( RectOverlaps( bb, obs ) )
-	{
-		const auto& pos = star.GetPosition();
-		star.SetPosition( { pos.x - ( bb.right - obs.left ), pos.y } );
-	}
+	world.Update( dt );
 }
 
 void Game::ComposeFrame()
 {
-	const auto obsTrans =
-		Matrix3x2f::Scaling( { RectWidth( obs ), RectHeight( obs ) } ) *
-		Matrix3x2f::Translation( RectCenter( obs ) );
-
-	gfx.DrawSprite( obsTrans, { resources.box } );
-
-	star.Draw( gfx );
+	world.Render( gfx );
 }

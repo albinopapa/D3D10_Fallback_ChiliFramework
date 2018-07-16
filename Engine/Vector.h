@@ -43,6 +43,7 @@ public:
 		y /= _scalar;
 		return *this;
 	}
+	static Vector Zero() { return { 0.f, 0.f }; }
 public:
 	T x, y;
 };
@@ -90,6 +91,8 @@ public:
 		z /= _scalar;
 		return *this;
 	}
+	static Vector Zero() { return { 0.f, 0.f, 0.f }; }
+
 public:
 	T x, y, z;
 };

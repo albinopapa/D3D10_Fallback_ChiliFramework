@@ -270,7 +270,7 @@ class float128
 {
 public:
 	float128() = default;
-	explicit float128( __m128 _dqword )
+	explicit float128( const __m128& _dqword )
 		:
 		value( _dqword )
 	{}

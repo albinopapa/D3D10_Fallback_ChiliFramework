@@ -5,9 +5,10 @@
 
 struct x86 {};
 struct SSE {};
+struct x86Scan {};
 
 template<class T> class BaryCoord {};
-template<class T>class Triangle {};
+template<class T> class Triangle {};
 
 struct Vertex
 {
@@ -40,6 +41,28 @@ private:
 	bool isbarycentric = false;
 };
 
+template<> class Triangle<x86Scan>
+{
+public:
+	Triangle( const Vertex& a, const Vertex& b, const Vertex& c )
+		:
+		v{ a, b, c }
+	{
+
+	}
+	const Vertex& operator[]( int idx )const
+	{
+		return GetVertex( idx );
+	}
+	const Vertex& GetVertex( int idx )const
+	{
+		assert( ( idx >= 0 && idx < 3 ) && "Idx out of range" );
+		return v[ idx ];
+	}
+private:
+	Vertex v[ 3 ];
+};
+
 template<> class Triangle<x86>
 {
 public:
@@ -47,13 +70,16 @@ public:
 	Triangle( const Vertex& a, const Vertex& b, const Vertex& c )
 		:
 		v{ a, b, c },
-		invarea( 1.f / ( CrossProduct( b.pos - a.pos, c.pos - a.pos ) * .5f ) )
-	{}
+		area( CrossProduct( b.pos - a.pos, c.pos - a.pos ) * .5f )
+	{
+	}
 	BaryCoord<x86> GetBaryCoords( const Vec2f& p )const
 	{
 		const Vec2f v0p = v[0].pos - p;
 		const Vec2f v1p = v[1].pos - p;
 		const Vec2f v2p = v[2].pos - p;
+
+		const auto invarea = GetInverseArea();
 
 		const float a = ( CrossProduct( v1p, v2p ) * .5f ) * invarea;
 		const float b = ( CrossProduct( v2p, v0p ) * .5f ) * invarea;
@@ -70,19 +96,23 @@ public:
 		assert( ( idx >= 0 && idx < 3 ) && "Idx out of range" );
 		return v[ idx ];
 	}
+	float GetArea()const
+	{
+		return area;
+	}
 	float GetInverseArea()const
 	{
-		return invarea;
+		return 1.f / area;
 	}
 private:
 	Vertex v[ 3 ];
-	float invarea = 0.f;
+	float area = 0.f;
 };
 
 template<> class BaryCoord<SSE>
 {
 public:
-	BaryCoord( float128 _a, float128 _b, float128 _c )
+	BaryCoord( const float128& _a, const float128& _b, const float128& _c )
 		:
 		a( _a ), b( _b ), c( _c )		
 	{
@@ -93,11 +123,11 @@ public:
 
 		isbarycentric = _mm_movemask_ps( mask );
 	}
-	bool IsBarycentric( int idx )const
+	int IsBarycentric( int idx )const
 	{
 		return ( isbarycentric >> ( 3 - idx ) ) & 1;
 	}
-	Vec2SSE _vectorcall Interpolate( const Vec2SSE v0, const Vec2SSE v1, const Vec2SSE v2 )const
+	Vec2SSE Interpolate( const Vec2SSE& v0, const Vec2SSE& v1, const Vec2SSE& v2 )const
 	{	
 		return ( v0 * a ) + ( v1 * b ) + ( v2 * c );
 	}
@@ -135,7 +165,7 @@ public:
 		vt[ 2 ].y = shuffle<3, 3, 3, 3>( temp2, temp2 );
 	}
 
-	BaryCoord<SSE> _vectorcall GetBaryCoords( const Vec2SSE P )const
+	BaryCoord<SSE> GetBaryCoords( const Vec2SSE& P )const
 	{
 		const Vec2SSE v0p = vp[ 0 ] - P;
 		const Vec2SSE v1p = vp[ 1 ] - P;
@@ -147,11 +177,11 @@ public:
 
 		return { a, b, c };
 	}
-	Vec2SSE GetVertexPosition( int idx )
+	const Vec2SSE& _vectorcall GetVertexPosition( int idx )const
 	{
 		return vp[ idx ];
 	}
-	Vec2SSE GetVertexTexcoord( int idx )const
+	const Vec2SSE& _vectorcall GetVertexTexcoord( int idx )const
 	{
 		return vt[ idx ];
 	}
